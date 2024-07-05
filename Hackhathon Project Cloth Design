@@ -1,0 +1,77 @@
+!pip install diffusers transformers
+import matplotlib.pyplot as plt
+import torch
+from huggingface_hub import login
+from diffusers import StableDiffusionPipeline
+
+# Replace 'your_api_token' with your actual Hugging Face API token
+login(token='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', add_to_git_credential=True)
+
+model_id1 = "stabilityai/stable-diffusion-2-1"
+
+# Load the model from Hugging Face Hub with the correct model ID
+pipe = StableDiffusionPipeline.from_pretrained(model_id1, torch_dtype=torch.float16)
+
+# Move the pipeline to the GPU
+pipe = pipe.to("cuda")
+
+# Define five different prompts
+prompts = [
+    "floral pattern, vibrant colors, summer dress",
+    "geometric pattern, monochrome, formal wear",
+    "abstract pattern, pastel colors, casual wear",
+    "tribal pattern, earthy tones, bohemian style",
+    "animal print, bold colors, evening gown"
+]
+
+# Generate and display images for each prompt
+fig, axs = plt.subplots(1, 5, figsize=(20, 4))
+
+for i, prompt in enumerate(prompts):
+    image = pipe(prompt).images[0]
+    axs[i].imshow(image)
+    axs[i].axis('off')
+    axs[i].set_title(f"Prompt {i+1}")
+
+plt.show()
+!pip install flask transformers diffusers huggingface_hub torch torchvision
+from flask import Flask, request, jsonify
+from huggingface_hub import cached_download
+import torch
+from diffusers import StableDiffusionPipeline
+
+# Model ID and Token (replace with your credentials)
+model_id = "stabilityai/stable-diffusion-2-1"
+api_token = "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"
+
+# Model Loading (outside request handling for efficiency)
+model = StableDiffusionPipeline.from_pretrained(
+    model_id, revision="fp16", torch_dtype=torch.float16, cache_dir="model_cache"
+)
+model = model.to("cuda" if torch.cuda.is_available() else "cpu")
+
+# Create the Flask app
+app = Flask(__name__)
+
+@app.route("/generate-image", methods=["POST"])
+def generate_image():
+    # Retrieve prompt from request data
+    prompt = request.json.get("prompt")
+
+    if not prompt:
+        return jsonify({"error": "Missing prompt in request body"}), 400
+
+    try:
+        # Generate image
+        image = model(prompt).images[0]
+
+        # Convert image to a format suitable for response (adjust based on your needs)
+        image_data = image.cpu().detach().numpy().astype(np.uint8)  # Example conversion
+
+        return jsonify({"image": image_data.tolist()})  # Example response format
+    except Exception as e:
+        print(f"Error generating image: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+
+if __name__ == "__main__":
+    app.run(debug=True)
